@@ -1,17 +1,17 @@
 .model tiny
 
-LOCALS		@@
+locals		@@
 ;---------------------
-CMDLNSEG	equ 080h
-VIDEOSEG	equ 0b800h
-LINE_SIZE	equ 160
-CENTER_POS	equ 80
-VLINE		equ 0bah
-HLINE		equ 0cdh
-LT			equ 0c9h
-RT			equ 0bbh
-LB			equ 0c8h
-RB			equ 0bch
+CMDLNSEG		equ 080h
+VIDEOSEG		equ 0b800h
+LINE_SIZE		equ 160
+CENTER_POS		equ 80
+VLINE			equ 0bah
+HLINE			equ 0cdh
+LTOP			equ 0c9h
+RTOP			equ 0bbh
+LBTM			equ 0c8h
+RBTM			equ 0bch
 ;---------------------
 
 .data
@@ -62,10 +62,10 @@ cmd_cpy proc
 	add bx, 2
 
 	test cx, cx
-	jz _exit_cmd_cpy
+	jz @@exit_cmd_cpy
 
 	dec cl
-	_cpy:
+	@@cpy:
 		mov al, [bx]
 
 		mov byte ptr es:[di], al	;symbol from cmd
@@ -73,9 +73,9 @@ cmd_cpy proc
 		add di, 2
 
 		inc bx
-	loop _cpy
+	loop @@cpy
 
-	_exit_cmd_cpy:
+	@@exit_cmd_cpy:
 ret
 cmd_cpy endp
 ;------------------------------
@@ -114,6 +114,7 @@ set_center proc
 	mul bh
 
 	xor bh, bh
+	and bl, 11111110b		; set lowest bit to zero (aligning)
 
 	add ax, CENTER_POS		; position = center - (strlen/2)*2	[*2, because attribute and bytes]
 	sub ax, bx
@@ -133,49 +134,49 @@ print_box proc
 	dec bl
 	xor ch, ch
 
-	mov byte ptr es:[di], LT		; draw left top corner
+	mov byte ptr es:[di], LTOP		; draw left top corner
 	mov byte ptr es:[di+1], ah
 	add di, 2
 
 	mov cl, bl
-	_top:							; draw top line
+	@@top:							; draw top line
 		mov byte ptr es:[di], HLINE
 		mov byte ptr es:[di+1], ah
 		add di, 2
-	loop _top
+	loop @@top
 
-	mov byte ptr es:[di], RT
+	mov byte ptr es:[di], RTOP
 	mov byte ptr es:[di+1], ah		; draw right top corner
 	add di, LINE_SIZE
 
 	mov cl, bh
-	_right:							; draw right line
+	@@right:							; draw right line
 		mov byte ptr es:[di], VLINE
 		mov byte ptr es:[di+1], ah
 		add di, LINE_SIZE
-	loop _right
+	loop @@right
 
-	mov byte ptr es:[di], RB		; draw right bottom corner
+	mov byte ptr es:[di], RBTM		; draw right bottom corner
 	mov byte ptr es:[di+1], ah
 	sub di, 2
 
 	mov cl, bl
-	_bottom:						; draw bottom line
+	@@bottom:						; draw bottom line
 		mov byte ptr es:[di], HLINE
 		mov byte ptr es:[di+1], ah
 		sub di, 2
-	loop _bottom
+	loop @@bottom
 
-	mov byte ptr es:[di], LB
+	mov byte ptr es:[di], LBTM
 	mov byte ptr es:[di+1], ah		; draw left bottom corner
 	sub di, LINE_SIZE
 
 	mov cl, bh
-	_left:							; draw left line
+	@@left:							; draw left line
 		mov byte ptr es:[di], VLINE
 		mov byte ptr es:[di+1], ah
 		sub di, LINE_SIZE
-	loop _left
+	loop @@left
 ret
 print_box endp
 
