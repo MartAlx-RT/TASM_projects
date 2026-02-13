@@ -12,6 +12,8 @@ LTOP			equ 0c9h
 RTOP			equ 0bbh
 LBTM			equ 0c8h
 RBTM			equ 0bch
+
+SLP_TIME		equ 10
 ;---------------------
 
 .data
@@ -20,6 +22,8 @@ RBTM			equ 0bch
 org 100h
 
 start proc
+	call cls
+
 	mov si, CMDLNSEG
 	mov bl, [si]		; write parameters for set_center
 	mov bh, 10
@@ -42,7 +46,7 @@ start proc
 	int 20h
 start endp
 
-;-----PRINT TEXT IN PRETTY BOX-
+;---PRINT TEXT IN PRETTY BOX---
 ;------------------------------
 ; si - data
 ; al - box color attribute
@@ -50,7 +54,7 @@ start endp
 ; bl - 'x' position
 ; bh - 'y' position
 ;------------------------------
-
+; sorry, not implemented
 
 ;-----COPY CMD ARGUMENTS-------
 ;------------------------------
@@ -58,7 +62,7 @@ start endp
 ; ah - color attribute
 cmd_cpy proc
 	mov bx, CMDLNSEG 
-	mov cl, [bx]
+	mov cl, [bx]					; cx = strlen, set bx to beginning of the line
 	add bx, 2
 
 	test cx, cx
@@ -68,11 +72,13 @@ cmd_cpy proc
 	@@cpy:
 		mov al, [bx]
 
-		mov byte ptr es:[di], al	;symbol from cmd
-		mov byte ptr es:[di+1], ah	;color atr
+		mov byte ptr es:[di], al	; cp symbol from cmd to screen
+		mov byte ptr es:[di+1], ah	; set color attribute
 		add di, 2
 
 		inc bx
+
+		call pause					; pause
 	loop @@cpy
 
 	@@exit_cmd_cpy:
@@ -131,8 +137,11 @@ set_center endp
 ; bh - height
 ; ah - color attribute
 print_box proc
+	test bl, bl
+	jz @@exit_print_box
+
 	dec bl
-	xor ch, ch
+	xor ch, ch						; correcting width && set counter (cx) to zero
 
 	mov byte ptr es:[di], LTOP		; draw left top corner
 	mov byte ptr es:[di+1], ah
@@ -150,7 +159,7 @@ print_box proc
 	add di, LINE_SIZE
 
 	mov cl, bh
-	@@right:							; draw right line
+	@@right:						; draw right line
 		mov byte ptr es:[di], VLINE
 		mov byte ptr es:[di+1], ah
 		add di, LINE_SIZE
@@ -177,7 +186,34 @@ print_box proc
 		mov byte ptr es:[di+1], ah
 		sub di, LINE_SIZE
 	loop @@left
+
+	@@exit_print_box:
 ret
 print_box endp
+
+;---PAUSE FOR SLP_TIME---
+pause proc
+	push ax cx dx
+
+	mov ah, 86h
+	mov cx, SLP_TIME
+	
+	int 15h
+
+	pop dx cx ax
+ret
+pause endp
+
+;---CLEAR SHELL---
+cls proc
+	push ax
+
+	xor ah, ah
+	mov al, 03h
+	int 10h
+
+	pop ax
+ret
+cls endp
 
 end start
