@@ -2,67 +2,65 @@
 
 locals		@@
 ;---------------------
-CMDLNSEG		equ 080h
-VIDEOSEG		equ 0b800h
-LINE_SIZE		equ 160
-CENTER_POS		equ 80
-VLINE			equ 0bah
-HLINE			equ 0cdh
-LTOP			equ 0c9h
-RTOP			equ 0bbh
-LBTM			equ 0c8h
-RBTM			equ 0bch
+CMDLNSEG		equ 080h		; arguments of cmd here
+VIDEOSEG		equ 0b800h		; videosegment here
+LINE_SIZE		equ 160			; line length in bytes (2 bytes/symbol)
+CENTER_POS		equ 80			; center of line in bytes
+VLINE			equ 0bah		; symbol that used as vertical line
+HLINE			equ 0cdh		; -----\\---\\---- as horizontal line
+LTOP			equ 0c9h		; left-top corner symbol
+RTOP			equ 0bbh		; right-top ---\\---\\--
+LBTM			equ 0c8h		; left-bottom ---\\---\\--
+RBTM			equ 0bch		; right-bottom ---\\---\\--
 
-SLP_TIME		equ 10
+SLP_TIME		equ 10			; pause time sleeping
+
+BOX_WIDTH		equ 20
+V_STARTPOS		equ 5
 ;---------------------
 
 .data
-
+	clr_attr	db	3h
+	str_buf		db	254, 100 dup('$')
 .code
 org 100h
 
 start proc
-	call cls
+	call cls					; clear screen
 
-	mov si, CMDLNSEG
-	mov bl, [si]		; write parameters for set_center
-	mov bh, 10
-	push bx				; and remember it
+	mov ah, 0ah
+	mov dx, offset str_buf		; input text
+	int 21h
 
-	call set_center		; set ds:[di]	(points to begginning of writing)
-	push di				; remember ds:[di]	(assuming that ds doesn't change)
+	mov si, offset str_buf + 2
+	mov cl, byte ptr [si-1]		; print aligning text
+	xor ch, ch
+	call aligned_print
 
-	mov ah, 35h			; set line color
-	call cmd_cpy		; write text
+	mov cl, BOX_WIDTH
+	mov ch, V_STARTPOS - 1		; set es:[di] to left-top corner
+	call set_center
 
-	pop di				; set ds:[di]	(points to begginning of drawing box)
-	sub di, (LINE_SIZE+2)
-
-	pop bx				; write parameters for set_center
-	mov bh, 1
-	mov ah, 3eh			; set line color 
+	sub bx, V_STARTPOS
+	mov bh, bl					; print box around the text
+	mov bl, BOX_WIDTH
 	call print_box
 
 	int 20h
 start endp
 
-;---PRINT TEXT IN PRETTY BOX---
-;------------------------------
-; si - data
-; al - box color attribute
-; ah - text color attribute
-; bl - 'x' position
-; bh - 'y' position
-;------------------------------
-; sorry, not implemented
-
 ;-----COPY CMD ARGUMENTS-------
 ;------------------------------
 ; es:[di] - offset for copy to 
-; ah - color attribute
+; used clr_attr
+;------------------------------
+; DESTR: ax, bx, cx and input parameters
 cmd_cpy proc
+	mov ah, clr_attr
+
 	mov bx, CMDLNSEG 
 	mov cl, [bx]					; cx = strlen, set bx to beginning of the line
+	xor ch, ch
 	add bx, 2
 
 	test cx, cx
@@ -92,6 +90,8 @@ cmd_cpy endp
 ; bl - 'x' (0..80)
 ; bh - 'y' (0..25)
 ; sets es:[di] to (x, y)
+;------------------------------
+; DESTR: ax, dx and input parameters
 set_xy proc
 	mov ax, VIDEOSEG
 	mov es, ax				; set es
@@ -109,21 +109,23 @@ set_xy endp
 
 ; SET ES:[DI] to print centering line
 ;------------------------------
-; bl - string length
-; bh - vertical position
+; cl - string length
+; ch - vertical position
 ; sets es:[di] to print centering line
+;------------------------------
+; DESTR: ax, dx and input parameters
 set_center proc
 	mov ax, VIDEOSEG
 	mov es, ax				; set es
 
 	mov ax, LINE_SIZE		; set 'y' offset (to ax)
-	mul bh
+	mul ch
 
-	xor bh, bh
-	and bl, 11111110b		; set lowest bit to zero (aligning)
+	xor ch, ch
+	and cl, 11111110b		; set lowest bit to zero (aligning)
 
 	add ax, CENTER_POS		; position = center - (strlen/2)*2	[*2, because attribute and bytes]
-	sub ax, bx
+	sub ax, cx
 
 	mov di, ax
 ret
@@ -135,10 +137,14 @@ set_center endp
 ; es:[di] - left-top position
 ; bl - width
 ; bh - height
-; ah - color attribute
+; used clr_attr
+;------------------------------
+; DESTR: cx, ax and input parameters
 print_box proc
+	mov ah, clr_attr
+
 	test bl, bl
-	jz @@exit_print_box
+		jz @@exit_print_box			; if you wanna print empty box, go fuck yourself
 
 	dec bl
 	xor ch, ch						; correcting width && set counter (cx) to zero
@@ -191,7 +197,8 @@ print_box proc
 ret
 print_box endp
 
-;---PAUSE FOR SLP_TIME---
+;------PAUSE FOR SLP_TIME------
+;---------nothing destroys-----
 pause proc
 	push ax cx dx
 
@@ -204,7 +211,8 @@ pause proc
 ret
 pause endp
 
-;---CLEAR SHELL---
+;-------CLEAR SHELL------------
+;------nothing destroys--------
 cls proc
 	push ax
 
@@ -215,5 +223,103 @@ cls proc
 	pop ax
 ret
 cls endp
+
+;--PRINT CENTER-ALIGNED TEXT---
+; si - source text
+; cx - length of text
+; used clr_attr
+; Destr: ax, bx, dx, di, bp, es and input parameters
+aligned_print proc
+	mov bp, sp
+
+	mov bx, si					; use bx for addressing
+	add bx, cx					; set bx to end of str
+
+	mov ax, 0ffffh				; 0ffffh - is the 'end' value, used as terminating value
+	push ax						; push 'end' value to end of stack
+	push bx
+
+	@@parse:					; parce (find and push) spaces
+		cmp byte ptr [bx], ' '
+			jne @@parse_continue
+		push bx
+
+		@@parse_continue:
+		dec bx
+		cmp bx, si				; untill line beginning reached
+			jg @@parse
+	;end parse
+
+	;----------------------------------------------------------------------------------
+	mov bx, V_STARTPOS			; begin with V_STARTPOS line, bx - vertical position
+
+	mov cx, si	;				\-\-\-\-\-\-\-\-\-\-\
+	mov dx, si	;				 \       \       \
+				;				 si      cx      dx
+	;           				start  old new   finding new
+
+	@@print_line:
+		mov si, cx
+		@@pop_spc:				; how many spaces is it possible to skip
+			mov cx, dx			; how many spaces is it possible to skip
+			pop dx				; dx = next space position
+
+			mov ax, dx
+			sub ax, si
+			cmp ax, BOX_WIDTH	; less than BOX_WIDTH?
+				jb @@pop_spc	; if less, it may possible to print another word
+		; end pop_spc
+
+		push dx cx
+
+		sub cx, si				; now, cx = len
+		test cx, cx
+			jz @@exit_print		; len = 0 => exit
+		inc cx					; correcting length
+
+		push cx
+		mov ax, bx
+		mov ch, al
+		call set_center			; set es:[di] to print aligned line
+		pop cx
+
+		call strncpy			; copy current line to vram
+
+		pop cx dx
+
+		inc bx					; vertical position ++
+		cmp dx, 0ffffh
+			jne @@print_line
+
+	@@exit_print:
+	mov sp, bp
+ret
+aligned_print endp
+
+
+;--COPY N BYTES FROM SI TO VIDEO--
+; si - source string
+; cx - strlen
+; used clr_attr
+; es:[di] - address for copy to
+; Destr: ax
+strncpy proc
+	mov ah, clr_attr
+	
+	test cx, cx
+		jz @@strncpy_exit			; length = 0 => exit
+	dec cx							; correct length
+	@@cpy_loop:
+		mov al, byte ptr [si]
+		mov byte ptr es:[di], al
+		mov byte ptr es:[di+1], ah
+
+		add di, 2
+		inc si
+	loop @@cpy_loop
+
+	@@strncpy_exit:
+ret
+strncpy endp
 
 end start

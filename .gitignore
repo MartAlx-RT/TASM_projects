@@ -6,6 +6,7 @@
 *.OBJ
 *.MAP
 *.map
+test.asm
 1.ASM
 CMP.ASM
 
