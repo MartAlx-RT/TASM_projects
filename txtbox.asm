@@ -13,15 +13,15 @@ RTOP			equ 0bbh		; right-top ---\\---\\--
 LBTM			equ 0c8h		; left-bottom ---\\---\\--
 RBTM			equ 0bch		; right-bottom ---\\---\\--
 
-SLP_TIME		equ 10			; pause time sleeping
+SLP_TIME		equ 10d			; pause time sleeping
 
-BOX_WIDTH		equ 20
-V_STARTPOS		equ 5
+BOX_WIDTH		equ 20d
+V_STARTPOS		equ 5d
 ;---------------------
 
 .data
 	clr_attr	db	3h
-	str_buf		db	254, 100 dup('$')
+	str_buf		db	254d, 260 dup(0)
 .code
 org 100h
 
@@ -37,10 +37,12 @@ start proc
 	xor ch, ch
 	call aligned_print
 
-	mov cl, BOX_WIDTH
+	;int 20h
+	mov cl, BOX_WIDTH+2
 	mov ch, V_STARTPOS - 1		; set es:[di] to left-top corner
 	call set_center
 
+	mov bx, bp
 	sub bx, V_STARTPOS
 	mov bh, bl					; print box around the text
 	mov bl, BOX_WIDTH
@@ -146,7 +148,7 @@ print_box proc
 	test bl, bl
 		jz @@exit_print_box			; if you wanna print empty box, go fuck yourself
 
-	dec bl
+	;dec bl
 	xor ch, ch						; correcting width && set counter (cx) to zero
 
 	mov byte ptr es:[di], LTOP		; draw left top corner
@@ -230,69 +232,93 @@ cls endp
 ; used clr_attr
 ; Destr: ax, bx, dx, di, bp, es and input parameters
 aligned_print proc
-	mov bp, sp
+	;mov bx, si					; use bx for addressing
+	;add bx, cx					; set bx to end of str
 
-	mov bx, si					; use bx for addressing
-	add bx, cx					; set bx to end of str
+	;mov ax, 0ffffh				; 0ffffh - is the 'end' value, used as terminating value
+	;push ax						; push 'end' value to end of stack
+	;push bx
 
-	mov ax, 0ffffh				; 0ffffh - is the 'end' value, used as terminating value
-	push ax						; push 'end' value to end of stack
-	push bx
+	;@@parse:					; parce (find and push) spaces
+	;	cmp byte ptr [bx], ' '
+	;		jne @@parse_continue
+	;	push bx
 
-	@@parse:					; parce (find and push) spaces
-		cmp byte ptr [bx], ' '
-			jne @@parse_continue
-		push bx
-
-		@@parse_continue:
-		dec bx
-		cmp bx, si				; untill line beginning reached
-			jg @@parse
-	;end parse
+	;	@@parse_continue:
+	;	dec bx
+	;	cmp bx, si				; untill line beginning reached
+	;		jg @@parse
+	;;end parse
 
 	;----------------------------------------------------------------------------------
-	mov bx, V_STARTPOS			; begin with V_STARTPOS line, bx - vertical position
+	mov bp, V_STARTPOS			; begin with V_STARTPOS line, bx - vertical position
 
-	mov cx, si	;				\-\-\-\-\-\-\-\-\-\-\
+	mov bx, si	;				\-\-\-\-\-\-\-\-\-\-\
 	mov dx, si	;				 \       \       \
-				;				 si      cx      dx
+				;				 si      dx      bx
 	;           				start  old new   finding new
-
 	@@print_line:
-		mov si, cx
-		@@pop_spc:				; how many spaces is it possible to skip
-			mov cx, dx			; how many spaces is it possible to skip
-			pop dx				; dx = next space position
+		mov si, dx
+	;	@@pop_spc:				; how many spaces is it possible to skip
+	;		mov cx, dx			; how many spaces is it possible to skip
+	;		pop dx				; dx = next space position
 
-			mov ax, dx
+	;		mov ax, dx
+	;		sub ax, si
+	;		cmp ax, BOX_WIDTH	; less than BOX_WIDTH?
+	;			jb @@pop_spc	; if less, it may possible to print another word
+	;	; end pop_spc
+
+		;push dx cx
+		@@max_seq:
+			mov dx, bx
+
+			@@find_space:
+				inc bx
+
+				cmp byte ptr [bx], 0
+			jz @@exit_print
+				cmp byte ptr [bx-1], ' '
+			jne @@find_space
+
+			mov ax, bx
 			sub ax, si
-			cmp ax, BOX_WIDTH	; less than BOX_WIDTH?
-				jb @@pop_spc	; if less, it may possible to print another word
-		; end pop_spc
+			cmp ax, BOX_WIDTH
+		jb @@max_seq
 
-		push dx cx
+		jmp @@exit_print_last_line
+		@@exit_print:
+		mov dx, bx
+		@@exit_print_last_line:
 
-		sub cx, si				; now, cx = len
-		test cx, cx
-			jz @@exit_print		; len = 0 => exit
-		inc cx					; correcting length
+		mov ax, dx
+		sub ax, si				; now, ax = len
+		;test cx, cx
+		;	jz @@exit_print		; len = 0 => exit
+		;inc cx					; correcting length
 
-		push cx
-		mov ax, bx
+		;push cx
+		;mov ax, bx
+		;mov ch, al
+		;call set_center			; set es:[di] to print aligned line
+		;pop cx
+
+		push dx bx ax
+
+		mov cl, al
+		mov ax, bp
 		mov ch, al
-		call set_center			; set es:[di] to print aligned line
+		call set_center
+		
 		pop cx
-
 		call strncpy			; copy current line to vram
+		inc bp					; vertical position ++
 
-		pop cx dx
+		pop bx dx
 
-		inc bx					; vertical position ++
-		cmp dx, 0ffffh
-			jne @@print_line
+		cmp byte ptr [bx], 0
+	jnz @@print_line
 
-	@@exit_print:
-	mov sp, bp
 ret
 aligned_print endp
 
