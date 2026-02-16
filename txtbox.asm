@@ -151,48 +151,66 @@ print_box proc
 	;dec bl
 	xor ch, ch						; correcting width && set counter (cx) to zero
 
-	mov byte ptr es:[di], LTOP		; draw left top corner
-	mov byte ptr es:[di+1], ah
-	add di, 2
+	;mov byte ptr es:[di], LTOP		; draw left top corner
+	;mov byte ptr es:[di+1], ah
+	;add di, 2
+	cld
+	mov al, LTOP
+	stosw
 
 	mov cl, bl
-	@@top:							; draw top line
-		mov byte ptr es:[di], HLINE
-		mov byte ptr es:[di+1], ah
-		add di, 2
-	loop @@top
+	mov al, HLINE
+	;@@top:							; draw top line
+	;	mov byte ptr es:[di], HLINE
+	;	mov byte ptr es:[di+1], ah
+	;	add di, 2
+	;loop @@top
+	rep stosw
 
-	mov byte ptr es:[di], RTOP
-	mov byte ptr es:[di+1], ah		; draw right top corner
-	add di, LINE_SIZE
+	;mov byte ptr es:[di], RTOP
+	;mov byte ptr es:[di+1], ah		; draw right top corner
+	mov al, RTOP
+	stosw
+	add di, LINE_SIZE-2				; -2 because 'stosw' adds 2 to di
 
 	mov cl, bh
+	mov al, VLINE
 	@@right:						; draw right line
-		mov byte ptr es:[di], VLINE
-		mov byte ptr es:[di+1], ah
-		add di, LINE_SIZE
+		;mov byte ptr es:[di], VLINE
+		;mov byte ptr es:[di+1], ah
+		stosw
+		add di, LINE_SIZE-2
 	loop @@right
 
-	mov byte ptr es:[di], RBTM		; draw right bottom corner
-	mov byte ptr es:[di+1], ah
-	sub di, 2
+	std
+	;mov byte ptr es:[di], RBTM		; draw right bottom corner
+	;mov byte ptr es:[di+1], ah
+	;sub di, 2
+	mov al, RBTM
+	stosw
 
 	mov cl, bl
-	@@bottom:						; draw bottom line
-		mov byte ptr es:[di], HLINE
-		mov byte ptr es:[di+1], ah
-		sub di, 2
-	loop @@bottom
+	mov al, HLINE
+	rep stosw
+	;@@bottom:						; draw bottom line
+	;	mov byte ptr es:[di], HLINE
+	;	mov byte ptr es:[di+1], ah
+	;	sub di, 2
+	;loop @@bottom
 
-	mov byte ptr es:[di], LBTM
-	mov byte ptr es:[di+1], ah		; draw left bottom corner
-	sub di, LINE_SIZE
+	mov al, LBTM
+	;mov byte ptr es:[di], LBTM
+	;mov byte ptr es:[di+1], ah		; draw left bottom corner
+	stosw
+	sub di, LINE_SIZE-2
 
 	mov cl, bh
+	mov al, VLINE
 	@@left:							; draw left line
-		mov byte ptr es:[di], VLINE
-		mov byte ptr es:[di+1], ah
-		sub di, LINE_SIZE
+		;mov byte ptr es:[di], VLINE
+		;mov byte ptr es:[di+1], ah
+		stosw
+		sub di, LINE_SIZE-2
 	loop @@left
 
 	@@exit_print_box:
@@ -337,10 +355,11 @@ strncpy proc
 	dec cx							; correct length
 	@@cpy_loop:
 		mov al, byte ptr [si]
-		mov byte ptr es:[di], al
-		mov byte ptr es:[di+1], ah
+		;mov byte ptr es:[di], al
+		;mov byte ptr es:[di+1], ah
+		stosw
 
-		add di, 2
+		;add di, 2
 		inc si
 	loop @@cpy_loop
 
