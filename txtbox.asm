@@ -55,29 +55,33 @@ je @@start								; if program runned without arguments, start with default opti
 	; cx - length of text
 	mov cl, byte ptr [si-1]		; print aligning text
 	xor ch, ch
-	call print_aligned			; now, bp = last line position
+	call print_aligned			; now, bx = last line position
 
 	; print box
 
-	;; set es:[di] to left-top corner
-	;; cl - string length
-	;mov cl, box_width
-	;; ch - vertical position
-	;mov ch, V_STARTPOS-1		; vertical pos = text vertical pos - 1
-	;call set_center
-	sub sp, 
-	xor cx, cx
+	; set es:[di] to left-top corner
+	; cl - string length
 	mov cl, box_width
+	; ch - vertical position
+	mov ch, V_STARTPOS-1		; vertical pos = text vertical pos - 1
+	call set_center
 	sub di, 2					; horizontal pos = text horizontal pos - 1 (sub -2 because each symbol is word)
 
 	; bh - height
-	mov bx, bp
-	sub bx, V_STARTPOS
-	mov bh, bl
+	mov ax, bx
+	sub ax, V_STARTPOS
+	;mov bh, bl
 	; bl - width
-	mov bl, box_width
+	;mov bl, box_width
 	;add bl, 2
+	mov bp, sp
+	sub bp, 4
+	mov byte ptr [bp+2], al
+	mov al, box_width
+	mov byte ptr [bp], al
+
 	call print_box				; print box around the text
+	add bp, 4
 
 	int 20h						; exit (halt program)
 ret
@@ -149,17 +153,16 @@ set_xy endp
 ;-------------------DESTROYS---------------------------
 ; ax, dx and input parameters
 ;------------------------------------------------------
-set_center proc str_len:word, y_pos:word
+set_center proc
 	mov ax, VIDEOSEG
 	mov es, ax				; set es
 
 	mov ax, LINE_SIZE		; set 'y' offset (to ax)
-	mul y_pos
-
-	and str_len, 11111110b		; set lowest bit to zero (aligning)
+	mul ch
 
 	xor ch, ch
-	mov cl, str_len
+	and cl, 11111110b		; set lowest bit to zero (aligning)
+
 	add ax, CENTER_POS		; position = center - (strlen/2)*2	[*2, because attribute and bytes]
 	sub ax, cx
 
@@ -180,20 +183,20 @@ set_center endp
 ;-------------------DESTROYS---------------------------
 ; cx, ax and input parameters
 ;------------------------------------------------------
-print_box proc
+print_box proc box_w:word, box_h:word
 	mov ah, clr_attr
 
-	test bl, bl
+	cmp box_w, 0
 		jz @@terminate_print_box			; if you wanna print empty box, go fuck yourself
 
-	xor ch, ch						; set counter (cx) to zero
+	xor cx, cx						; set counter (cx) to zero
 
 	cld								; forward 'stosw' mode
 
 	mov al, LTOP					; draw left-top corner
 	stosw
 
-	mov cl, bl
+	mov cx, box_w
 	mov al, HLINE					; draw upper horizontal line
 	rep stosw
 
@@ -201,7 +204,7 @@ print_box proc
 	stosw
 	add di, LINE_SIZE-2				; -2 because 'stosw' adds 2 to di
 
-	mov cl, bh
+	mov cx, box_h
 	mov al, VLINE
 	@@right:						; draw right line
 		stosw
@@ -213,7 +216,7 @@ print_box proc
 	mov al, RBTM					; draw right-bottom corner
 	stosw
 
-	mov cl, bl
+	mov cx, box_w
 	mov al, HLINE					; draw lower horizontal line
 	rep stosw
 	
@@ -221,7 +224,7 @@ print_box proc
 	stosw
 	sub di, LINE_SIZE-2
 
-	mov cl, bh
+	mov cx, box_h
 	mov al, VLINE
 	@@left:							; draw left line
 		stosw
@@ -287,11 +290,11 @@ cls endp
 ; ax, bx, dx, di, bp, es and input parameters
 ;------------------------------------------------------
 print_aligned proc
-	mov bp, V_STARTPOS			; begin with V_STARTPOS line, bp - vertical position
+	mov bx, V_STARTPOS			; begin with V_STARTPOS line, bp - vertical position
 
-	mov bx, si	;				\-\-\-\-\-\-\-\-\-\-\
+	mov bp, si	;				\-\-\-\-\-\-\-\-\-\-\
 	mov dx, si	;				 \       \       \
-				;				 si      dx      bx
+				;				 si      dx      bp
 	;           				start  old new   finding new
 
 	dec dx						; print_line starts with inc dx (podgon...)
@@ -301,22 +304,22 @@ print_aligned proc
 		mov si, dx				; start with 'old new' position
 
 		@@max_seq:				; loop that find max sequence that fits in the line
-			mov dx, bx
+			mov dx, bp
 
-			cmp byte ptr [bx], 0
+			cmp byte ptr [bp], 0
 		je @@terminate_print
 
 			@@find_space:
-				inc bx
+				inc bp
 
-				cmp byte ptr [bx], 0
+				cmp byte ptr [bp], 0
 			je @@end_reached			; check for 'null' or space
-				cmp byte ptr [bx], ' '
+				cmp byte ptr [bp], ' '
 			jne @@find_space
 
 			@@end_reached:
 
-			mov ax, bx
+			mov ax, bp
 			sub ax, si
 			cmp al, box_width	; is it fit in the box?
 		jbe @@max_seq			; yes: continue searching
@@ -326,20 +329,20 @@ print_aligned proc
 		mov ax, dx
 		sub ax, si				; now, ax = len
 
-		push dx bx ax			; save positions
+		push dx bp ax			; save positions
 
 		mov cl, al
-		mov ax, bp				; set es:[di] to print centering
+		mov ax, bx				; set es:[di] to print centering
 		mov ch, al
 		call set_center
 		
 		pop cx					; restore length
 		call strncpy			; copy current line to vram
-		inc bp					; vertical position ++
+		inc bx					; vertical position ++
 
-		pop bx dx				; restore pointers
+		pop bp dx				; restore pointers
 
-		cmp bx, dx
+		cmp bp, dx
 	jne @@print_line
 
 ret
