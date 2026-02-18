@@ -21,56 +21,93 @@ V_STARTPOS		equ 5d
 .data
 	clr_attr	db	3h					; used in print functions as color attribute
 	str_buf		db	254d, 260 dup(0)	; for input text
-	box_width	db	20d					; width of box (1...70)
+	box_width	db	20d					; inner width of box (1...70), default width is 20
+
+;------------------------------------------------------------------------------------
+;------------------------------------------------------------------------------------
 .code
 org 100h
 
 start proc
+
+	; parsing cmd arguments (now only can parse two-digital numers)
 	mov bx, CMDLNSEG
 	cmp byte ptr [bx], 0
-je @@start						; if program runned without arguments
+je @@start								; if program runned without arguments, start with default options
 
-	sub word ptr [bx+2], '0' + '0'*100h
-	mov al, byte ptr [bx+2]
-	mov cl, 10d					; convert ascii to 2-digitals number
-	mul cl
+	sub word ptr [bx+2], '0' + '0'*100h	; convertion ascii to 2-digitals number
+	mov al, byte ptr [bx+2]				; al = (highest digit)
+	mov cl, 10d
+	mul cl								; cl = cl*10 + (lower digit)
 	add al, byte ptr [bx+3]
 
-	mov box_width, al
+	mov box_width, al					; set box_width
 
 @@start:
 	call cls					; clear screen
+	
+	call input_str
 
+	; print text
+
+	; si - source text
+	mov si, offset str_buf+2
+	; cx - length of text
+	mov cl, byte ptr [si-1]		; print aligning text
+	xor ch, ch
+	call print_aligned			; now, bp = last line position
+
+	; print box
+
+	; set es:[di] to left-top corner
+	; cl - string length
+	mov cl, box_width
+	; ch - vertical position
+	mov ch, V_STARTPOS-1		; vertical pos = text vertical pos - 1
+	call set_center
+	sub di, 2					; horizontal pos = text horizontal pos - 1 (sub -2 because each symbol is word)
+
+	; bh - height
+	mov bx, bp
+	sub bx, V_STARTPOS
+	mov bh, bl
+	; bl - width
+	mov bl, box_width
+	;add bl, 2
+	call print_box				; print box around the text
+
+	int 20h						; exit (halt program)
+ret
+start endp
+
+
+;------------------------------------------------------
+;-----------------INPUT_STR FUNCTION-------------------
+; input string from stdin && add 0 at the end (asciz)
+;-------------------EXPECTED---------------------------
+; used str_buf
+;-------------------RETURNS----------------------------
+; writes input string to str_buf
+;-------------------DESTROYS---------------------------
+; ax, dx and input parameters
+;------------------------------------------------------
+input_str proc
 	mov ah, 0ah
 	mov dx, offset str_buf		; input text
 	int 21h
+
+	xor ax, ax
+	mov al, byte ptr [bx-1]		; ax = strlen
+
 	mov bx, offset str_buf+2
-	xor ah, ah
-	mov al, byte ptr [bx-1]
-	add bx, ax
-	mov byte ptr [bx], 0
+	add bx, ax					; bx = end of str
 
-	mov si, offset str_buf+2
-	mov cl, byte ptr [si-1]		; print aligning text
-	xor ch, ch
-	call print_aligned
-
-	mov cl, box_width
-	;add cl, 2
-	mov ch, V_STARTPOS-1		; set es:[di] to left-top corner
-	call set_center
-	sub di, 2
-
-	mov bx, bp
-	sub bx, V_STARTPOS
-	mov bh, bl					; print box around the text
-	mov bl, box_width
-	;add bl, 2
-	call print_box
-
-	int 20h
+	mov byte ptr [bx], 0		; add 0 to the end of the string
 ret
-start endp
+input_str endp
+
+
+
 
 ;------------------------------------------------------
 ;-----------------SET_XY FUNCTION----------------------
@@ -145,8 +182,7 @@ print_box proc
 	test bl, bl
 		jz @@terminate_print_box			; if you wanna print empty box, go fuck yourself
 
-	xor ch, ch						; correcting width && set counter (cx) to zero
-	;dec bl
+	xor ch, ch						; set counter (cx) to zero
 
 	cld								; forward 'stosw' mode
 
@@ -226,8 +262,8 @@ cls proc
 	push ax
 
 	xor ah, ah
-	mov al, 03h
-	int 10h
+	mov al, 03h		; set third video-mode
+	int 10h			; and cleared screen (automatically)
 
 	pop ax
 ret
@@ -240,9 +276,9 @@ cls endp
 ; si - source text
 ; cx - length of text
 ; used clr_attr
-;-------------------RETURNS----------------------------
-; prints center-aligned text
 ; beginning with V_STARTPOS line
+;-------------------RETURNS----------------------------
+; bp - last line position
 ;-------------------DESTROYS---------------------------
 ; ax, bx, dx, di, bp, es and input parameters
 ;------------------------------------------------------
@@ -282,11 +318,9 @@ print_aligned proc
 		jbe @@max_seq			; yes: continue searching
 
 		@@terminate_print:		; if end reached, print last string
-		;mov dx, bx
 
 		mov ax, dx
 		sub ax, si				; now, ax = len
-		;dec ax
 
 		push dx bx ax			; save positions
 
@@ -301,7 +335,6 @@ print_aligned proc
 
 		pop bx dx				; restore pointers
 
-		;cmp byte ptr [dx], 0	; if end of the text didn't reach, continue
 		cmp bx, dx
 	jne @@print_line
 
@@ -320,7 +353,7 @@ strncpy proc
 	
 	test cx, cx
 		jz @@strncpy_exit			; length = 0 => exit
-	;dec cx							; correct length
+
 	@@cpy_loop:
 		mov al, byte ptr [si]
 		stosw						; copy to es:[di]
@@ -332,3 +365,5 @@ ret
 strncpy endp
 
 end start
+;------------------------------------------------------------------------------------
+;------------------------------------------------------------------------------------
