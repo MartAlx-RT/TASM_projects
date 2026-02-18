@@ -59,12 +59,15 @@ je @@start								; if program runned without arguments, start with default opti
 
 	; print box
 
-	; set es:[di] to left-top corner
-	; cl - string length
+	;; set es:[di] to left-top corner
+	;; cl - string length
+	;mov cl, box_width
+	;; ch - vertical position
+	;mov ch, V_STARTPOS-1		; vertical pos = text vertical pos - 1
+	;call set_center
+	sub sp, 
+	xor cx, cx
 	mov cl, box_width
-	; ch - vertical position
-	mov ch, V_STARTPOS-1		; vertical pos = text vertical pos - 1
-	call set_center
 	sub di, 2					; horizontal pos = text horizontal pos - 1 (sub -2 because each symbol is word)
 
 	; bh - height
@@ -146,16 +149,17 @@ set_xy endp
 ;-------------------DESTROYS---------------------------
 ; ax, dx and input parameters
 ;------------------------------------------------------
-set_center proc
+set_center proc str_len:word, y_pos:word
 	mov ax, VIDEOSEG
 	mov es, ax				; set es
 
 	mov ax, LINE_SIZE		; set 'y' offset (to ax)
-	mul ch
+	mul y_pos
+
+	and str_len, 11111110b		; set lowest bit to zero (aligning)
 
 	xor ch, ch
-	and cl, 11111110b		; set lowest bit to zero (aligning)
-
+	mov cl, str_len
 	add ax, CENTER_POS		; position = center - (strlen/2)*2	[*2, because attribute and bytes]
 	sub ax, cx
 
