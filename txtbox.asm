@@ -97,9 +97,9 @@ input_str proc
 	int 21h
 
 	xor ax, ax
-	mov al, byte ptr [bx-1]		; ax = strlen
 
 	mov bx, offset str_buf+2
+	mov al, byte ptr [bx-1]		; ax = strlen
 	add bx, ax					; bx = end of str
 
 	mov byte ptr [bx], 0		; add 0 to the end of the string
@@ -290,14 +290,17 @@ print_aligned proc
 				;				 si      dx      bx
 	;           				start  old new   finding new
 
+	dec dx						; print_line starts with inc dx (podgon...)
+
 	@@print_line:				; external loop that prints line by line
+		inc dx					; skip separation space
 		mov si, dx				; start with 'old new' position
 
 		@@max_seq:				; loop that find max sequence that fits in the line
 			mov dx, bx
 
 			cmp byte ptr [bx], 0
-			je @@terminate_print
+		je @@terminate_print
 
 			@@find_space:
 				inc bx
@@ -307,10 +310,7 @@ print_aligned proc
 				cmp byte ptr [bx], ' '
 			jne @@find_space
 
-			jmp @@normal_continue	; if end didn't reach, continue normally
 			@@end_reached:
-				;mov bx, -1
-			@@normal_continue:
 
 			mov ax, bx
 			sub ax, si
