@@ -28,7 +28,6 @@ V_STARTPOS		equ 5d
 .code
 org 100h
 
-include boxlib.asm
 
 start proc
 
@@ -76,8 +75,8 @@ je @@start								; if program runned without arguments, start with default opti
 
 	xor ax, ax
 	mov al, box_width
-	mov word ptr [bp], ax		; load box width
-	mov word ptr [bp+2], bx		; load box height
+	mov word ptr [bp+2], ax		; load box width
+	mov word ptr [bp], bx		; load box height
 
 	call print_box
 	add sp, 4
@@ -87,6 +86,7 @@ je @@start								; if program runned without arguments, start with default opti
 	ret
 start endp
 
+include boxlib.asm
 end start
 ;------------------------------------------------------------------------------------
 ;------------------------------------------------------------------------------------

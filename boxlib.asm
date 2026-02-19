@@ -90,7 +90,7 @@ set_center endp
 ;-----------------PRINT_BOX  FUNCTION------------------
 ; SETS ES:[DI] to (bl, bh) TO PRINT CENTERING
 ;-------------------EXPECTED---------------------------
-; !! CDECL CALLING CONVENTION !!
+; !! PASCAL CONVENTION !!
 ; 1st arg(word) - box width
 ; 2nd arg(word) - box height
 ; used clr_attr
@@ -99,13 +99,13 @@ set_center endp
 ;-------------------DESTROYS---------------------------
 ; cx, ax and input parameters
 ;------------------------------------------------------
-print_box proc box_w:word, box_h:word
+print_box proc
 	push bp
 	mov bp, sp
 
 	mov ah, clr_attr
 
-	cmp box_w, 0
+	cmp word ptr [bp+6], 0
 		jz @@terminate_print_box			; if you wanna print empty box, go fuck yourself
 
 	xor cx, cx						; set counter (cx) to zero
@@ -115,7 +115,7 @@ print_box proc box_w:word, box_h:word
 	mov al, LTOP					; draw left-top corner
 	stosw
 
-	mov cx, box_w
+	mov cx, [bp+6]
 	mov al, HLINE					; draw upper horizontal line
 	rep stosw
 
@@ -123,7 +123,7 @@ print_box proc box_w:word, box_h:word
 	stosw
 	add di, LINE_SIZE-2				; -2 because 'stosw' adds 2 to di
 
-	mov cx, box_h
+	mov cx, [bp+4]
 	mov al, VLINE
 	@@right:						; draw right line
 		stosw
@@ -135,7 +135,7 @@ print_box proc box_w:word, box_h:word
 	mov al, RBTM					; draw right-bottom corner
 	stosw
 
-	mov cx, box_w
+	mov cx, [bp+6]
 	mov al, HLINE					; draw lower horizontal line
 	rep stosw
 	
@@ -143,7 +143,7 @@ print_box proc box_w:word, box_h:word
 	stosw
 	sub di, LINE_SIZE-2
 
-	mov cx, box_h
+	mov cx, [bp+4]
 	mov al, VLINE
 	@@left:							; draw left line
 		stosw
@@ -152,7 +152,7 @@ print_box proc box_w:word, box_h:word
 
 	@@terminate_print_box:
 	pop bp
-	ret
+	ret 4
 print_box endp
 
 
@@ -200,8 +200,6 @@ cls proc
 cls endp
 
 
-
-
 ;------------------------------------------------------
 ;-----------------PRINT_ALIGNED FUNCTION---------------
 ; prints center-aligned text
@@ -215,13 +213,12 @@ cls endp
 ;-------------------DESTROYS---------------------------
 ; ax, bx, dx, di, bp, es and input parameters
 ;------------------------------------------------------
-print_aligned proc str:word, str_end:word
+print_aligned proc
 	mov bx, V_STARTPOS			; begin with V_STARTPOS line, bp - vertical position
-	mov si, str
 
-	mov di, si	;				\-\-\-\-\-\-\-\-\-\-\
+	mov bp, si	;				\-\-\-\-\-\-\-\-\-\-\
 	mov dx, si	;				 \       \       \
-				;				 si      dx      di
+				;				 si      dx      bp
 	;           				start  old new   finding new
 
 	dec dx						; print_line starts with inc dx (podgon...)
@@ -231,22 +228,22 @@ print_aligned proc str:word, str_end:word
 		mov si, dx				; start with 'old new' position
 
 		@@max_seq:				; loop that find max sequence that fits in the line
-			mov dx, di
+			mov dx, bp
 
-			cmp byte ptr [di], 0
+			cmp byte ptr [bp], 0
 		je @@terminate_print
 
 			@@find_space:
-				inc di
+				inc bp
 
-				cmp byte ptr [di], 0
+				cmp byte ptr [bp], 0
 			je @@end_reached			; check for 'null' or space
-				cmp byte ptr [di], ' '
+				cmp byte ptr [bp], ' '
 			jne @@find_space
 
 			@@end_reached:
 
-			mov ax, di
+			mov ax, bp
 			sub ax, si
 			cmp al, box_width	; is it fit in the box?
 		jbe @@max_seq			; yes: continue searching
@@ -256,7 +253,7 @@ print_aligned proc str:word, str_end:word
 		mov ax, dx
 		sub ax, si				; now, ax = len
 
-		push dx di ax			; save positions
+		push dx bp ax			; save positions
 
 		mov cl, al
 		mov ax, bx				; set es:[di] to print centering
@@ -267,14 +264,89 @@ print_aligned proc str:word, str_end:word
 		call strncpy			; copy current line to vram
 		inc bx					; vertical position ++
 
-		pop di dx				; restore pointers
+		pop bp dx				; restore pointers
 
-		;cmp di, dx
-		cmp si, str_end
+		cmp bp, dx
 	jne @@print_line
 
-	ret
+ret
 print_aligned endp
+
+
+
+;;------------------------------------------------------
+;;-----------------PRINT_ALIGNED FUNCTION---------------
+;; prints center-aligned text
+;;-------------------EXPECTED---------------------------
+;; si - source text
+;; cx - length of text
+;; used clr_attr
+;; beginning with V_STARTPOS line
+;;-------------------RETURNS----------------------------
+;; bp - last line position
+;;-------------------DESTROYS---------------------------
+;; ax, bx, dx, di, bp, es and input parameters
+;;------------------------------------------------------
+;print_aligned proc str:word, str_end:word
+;	mov bx, V_STARTPOS			; begin with V_STARTPOS line, bp - vertical position
+;	mov si, str
+;
+;	mov di, si	;				\-\-\-\-\-\-\-\-\-\-\
+;	mov dx, si	;				 \       \       \
+;				;				 si      dx      di
+;	;           				start  old new   finding new
+;
+;	dec dx						; print_line starts with inc dx (podgon...)
+;
+;	@@print_line:				; external loop that prints line by line
+;		inc dx					; skip separation space
+;		mov si, dx				; start with 'old new' position
+;
+;		@@max_seq:				; loop that find max sequence that fits in the line
+;			mov dx, di
+;
+;			cmp byte ptr [di], 0
+;		je @@terminate_print
+;
+;			@@find_space:
+;				inc di
+;
+;				cmp byte ptr [di], 0
+;			je @@end_reached			; check for 'null' or space
+;				cmp byte ptr [di], ' '
+;			jne @@find_space
+;
+;			@@end_reached:
+;
+;			mov ax, di
+;			sub ax, si
+;			cmp al, box_width	; is it fit in the box?
+;		jbe @@max_seq			; yes: continue searching
+;
+;		@@terminate_print:		; if end reached, print last string
+;
+;		mov ax, dx
+;		sub ax, si				; now, ax = len
+;
+;		push dx di ax			; save positions
+;
+;		mov cl, al
+;		mov ax, bx				; set es:[di] to print centering
+;		mov ch, al
+;		call set_center
+;		
+;		pop cx					; restore length
+;		call strncpy			; copy current line to vram
+;		inc bx					; vertical position ++
+;
+;		pop di dx				; restore pointers
+;
+;		;cmp di, dx
+;		cmp si, str_end
+;	jne @@print_line
+;
+;	ret
+;print_aligned endp
 
 
 ;--COPY N BYTES FROM SI TO VIDEO--
