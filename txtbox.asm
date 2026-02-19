@@ -51,12 +51,21 @@ je @@start								; if program runned without arguments, start with default opti
 
 	; print text
 
-	; si - source text
-	mov si, offset str_buf+2
-	; cx - length of text
-	mov cl, byte ptr [si-1]		; print aligning text
-	xor ch, ch
+	; print_aligned (cdecl)
+	mov bx, offset str_buf + 2	; bx = str
+	xor ax, ax
+	mov al, byte ptr [bx-1]
+	add ax, bx					; ax = str_end
+
+	sub bp, 4
+	mov bp, sp
+
+	mov word ptr [bp], bx		; load s
+	mov word ptr [bp+2], ax		; load s_len
+
 	call print_aligned
+	add sp, 4
+
 	sub bx, V_STARTPOS			; now, bx = box height
 
 	; print box around the text
@@ -69,7 +78,7 @@ je @@start								; if program runned without arguments, start with default opti
 	call set_center
 	sub di, 2					; horizontal pos = text horizontal pos - 1 (sub -2 because each symbol is word)
 
-	; print_box (used cdecl convention)
+	; print_box (pascal)
 	sub sp, 4
 	mov bp, sp
 
@@ -79,7 +88,6 @@ je @@start								; if program runned without arguments, start with default opti
 	mov word ptr [bp], bx		; load box height
 
 	call print_box
-	add sp, 4
 
 	; exit
 	int 20h

@@ -200,6 +200,8 @@ cls proc
 cls endp
 
 
+
+
 ;------------------------------------------------------
 ;-----------------PRINT_ALIGNED FUNCTION---------------
 ; prints center-aligned text
@@ -213,12 +215,16 @@ cls endp
 ;-------------------DESTROYS---------------------------
 ; ax, bx, dx, di, bp, es and input parameters
 ;------------------------------------------------------
-print_aligned proc
-	mov bx, V_STARTPOS			; begin with V_STARTPOS line, bp - vertical position
+print_aligned proc s:word, s_end:word
+	push bp
+	mov bp, sp
 
-	mov bp, si	;				\-\-\-\-\-\-\-\-\-\-\
+	mov bx, V_STARTPOS			; begin with V_STARTPOS line, bp - vertical position
+	mov si, s
+
+	mov di, si	;				\-\-\-\-\-\-\-\-\-\-\
 	mov dx, si	;				 \       \       \
-				;				 si      dx      bp
+				;				 si      dx      di
 	;           				start  old new   finding new
 
 	dec dx						; print_line starts with inc dx (podgon...)
@@ -228,22 +234,22 @@ print_aligned proc
 		mov si, dx				; start with 'old new' position
 
 		@@max_seq:				; loop that find max sequence that fits in the line
-			mov dx, bp
+			mov dx, di
 
-			cmp byte ptr [bp], 0
+			cmp byte ptr [di], 0
 		je @@terminate_print
 
 			@@find_space:
-				inc bp
+				inc di
 
-				cmp byte ptr [bp], 0
+				cmp byte ptr [di], 0
 			je @@end_reached			; check for 'null' or space
-				cmp byte ptr [bp], ' '
+				cmp byte ptr [di], ' '
 			jne @@find_space
 
 			@@end_reached:
 
-			mov ax, bp
+			mov ax, di
 			sub ax, si
 			cmp al, box_width	; is it fit in the box?
 		jbe @@max_seq			; yes: continue searching
@@ -253,7 +259,7 @@ print_aligned proc
 		mov ax, dx
 		sub ax, si				; now, ax = len
 
-		push dx bp ax			; save positions
+		push dx di ax			; save positions
 
 		mov cl, al
 		mov ax, bx				; set es:[di] to print centering
@@ -264,89 +270,14 @@ print_aligned proc
 		call strncpy			; copy current line to vram
 		inc bx					; vertical position ++
 
-		pop bp dx				; restore pointers
+		pop di dx				; restore pointers
 
-		cmp bp, dx
+		cmp si, s_end
 	jne @@print_line
 
-ret
+	pop bp
+	ret
 print_aligned endp
-
-
-
-;;------------------------------------------------------
-;;-----------------PRINT_ALIGNED FUNCTION---------------
-;; prints center-aligned text
-;;-------------------EXPECTED---------------------------
-;; si - source text
-;; cx - length of text
-;; used clr_attr
-;; beginning with V_STARTPOS line
-;;-------------------RETURNS----------------------------
-;; bp - last line position
-;;-------------------DESTROYS---------------------------
-;; ax, bx, dx, di, bp, es and input parameters
-;;------------------------------------------------------
-;print_aligned proc str:word, str_end:word
-;	mov bx, V_STARTPOS			; begin with V_STARTPOS line, bp - vertical position
-;	mov si, str
-;
-;	mov di, si	;				\-\-\-\-\-\-\-\-\-\-\
-;	mov dx, si	;				 \       \       \
-;				;				 si      dx      di
-;	;           				start  old new   finding new
-;
-;	dec dx						; print_line starts with inc dx (podgon...)
-;
-;	@@print_line:				; external loop that prints line by line
-;		inc dx					; skip separation space
-;		mov si, dx				; start with 'old new' position
-;
-;		@@max_seq:				; loop that find max sequence that fits in the line
-;			mov dx, di
-;
-;			cmp byte ptr [di], 0
-;		je @@terminate_print
-;
-;			@@find_space:
-;				inc di
-;
-;				cmp byte ptr [di], 0
-;			je @@end_reached			; check for 'null' or space
-;				cmp byte ptr [di], ' '
-;			jne @@find_space
-;
-;			@@end_reached:
-;
-;			mov ax, di
-;			sub ax, si
-;			cmp al, box_width	; is it fit in the box?
-;		jbe @@max_seq			; yes: continue searching
-;
-;		@@terminate_print:		; if end reached, print last string
-;
-;		mov ax, dx
-;		sub ax, si				; now, ax = len
-;
-;		push dx di ax			; save positions
-;
-;		mov cl, al
-;		mov ax, bx				; set es:[di] to print centering
-;		mov ch, al
-;		call set_center
-;		
-;		pop cx					; restore length
-;		call strncpy			; copy current line to vram
-;		inc bx					; vertical position ++
-;
-;		pop di dx				; restore pointers
-;
-;		;cmp di, dx
-;		cmp si, str_end
-;	jne @@print_line
-;
-;	ret
-;print_aligned endp
 
 
 ;--COPY N BYTES FROM SI TO VIDEO--
