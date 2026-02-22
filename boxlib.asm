@@ -189,13 +189,18 @@ pause endp
 ; nothing
 ;------------------------------------------------------
 cls proc
-	push ax
+	push ax cx es di
 
-	xor ah, ah
-	mov al, 03h		; set third video-mode
-	int 10h			; and cleared screen (automatically)
+	mov cx, 80*25
+	mov ax, VIDEOSEG
+	mov es, ax
+	xor di, di
+	xor ax, ax
+	mov ah, 07h
+	cld
+	rep stosw
 
-	pop ax
+	pop di es cx ax
 	ret
 cls endp
 
@@ -206,8 +211,9 @@ cls endp
 ;-----------------PRINT_ALIGNED FUNCTION---------------
 ; prints center-aligned text
 ;-------------------EXPECTED---------------------------
-; si - source text
-; cx - length of text
+; !! CDECL CONVENTION !!
+; 1st arg (word) - beginning of the string
+; 2nd arg (word) - end of the string
 ; used clr_attr
 ; beginning with V_STARTPOS line
 ;-------------------RETURNS----------------------------
@@ -281,25 +287,50 @@ print_aligned endp
 
 
 ;--COPY N BYTES FROM SI TO VIDEO--
-; si - source string
-; cx - strlen
 ; used clr_attr
 ; es:[di] - address for copy to
-; Destr: ax
+;------------------------------------------------------
+;-----------------PRINT_ALIGNED FUNCTION---------------
+; prints center-aligned text
+;-------------------EXPECTED---------------------------
+; !! CDECL CONVENTION !!
+; 1st arg (word) - beginning of the string
+; cx - strlen
+; si - source string
+; used clr_attr
+; es:[di] - address for copy to
+;-------------------RETURNS----------------------------
+;-------------------DESTROYS---------------------------
+; ax, cx, df
+;------------------------------------------------------
 strncpy proc
 	mov ah, clr_attr
 	
 	test cx, cx
 		jz @@strncpy_exit			; length = 0 => exit
 
+	cld
 	@@cpy_loop:
-		mov al, byte ptr [si]
+		lodsb
 		stosw						; copy to es:[di]
-		inc si
 	loop @@cpy_loop
 
 	@@strncpy_exit:
 	ret
 strncpy endp
+
+
+
+
+atoi proc
+	cld
+	mov bx, 10d
+	@@atoi_loop:
+		lodsb
+		sub al, '0'
+		mov bl, al
+		mul 10d
+		mov dx, ax
+		
 ;------------------------------------------------------------------------------------
 ;------------------------------------------------------------------------------------
