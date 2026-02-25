@@ -315,16 +315,42 @@ strncpy	endp
 
 
 
+;------------------------------------------------------
+;-----------------ATOI          FUNCTION---------------
+; convert cmd string to 16bit-integer
+;-------------------EXPECTED---------------------------
+; none
+;-------------------RETURNS----------------------------
+; bx - number
+;-------------------DESTROYS---------------------------
+; ax, bx, cx, si, df
+;------------------------------------------------------
+atoi	proc	
+	cld
+	xor	ax, ax
+	xor	bx, bx	; answer
+	xor	cx, cx
+	mov	si, CMDLNSEG
 
-;atoi	proc	
-;	cld
-;	mov	bx, 10d
-;	@@atoi_loop:
-;		lodsb
-;		sub	al, '0'
-;		mov	bl, al
-;		mul	10d
-;		mov	dx, ax
-;		
+	cmp	byte ptr ds:[si], 0
+	jz	@@atoi_exit
+
+	add	si, 2
+@@atoi_loop:
+	lodsb
+	cmp	al, CR
+	je	@@atoi_exit
+
+	sub	al, '0'
+	mov	cx, bx
+	shl	cx, 1	; cx = bx*2
+	shl	bx, 3	; bx = bx*8
+	add	bx, cx
+	add	bx, ax
+	jmp	@@atoi_loop
+
+@@atoi_exit:
+	ret
+atoi	endp
 ;------------------------------------------------------------------------------------
 ;------------------------------------------------------------------------------------

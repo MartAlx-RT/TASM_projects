@@ -12,6 +12,7 @@ LTOP			equ 0c9h		; left-top corner symbol
 RTOP			equ 0bbh		; right-top corner symbol
 LBTM			equ 0c8h		; left-bottom corner symbol
 RBTM			equ 0bch		; right-bottom corner symbol
+CR			equ 0dh
 
 SLP_TIME		equ 10d			; pause time sleeping
 
@@ -28,22 +29,10 @@ V_STARTPOS		equ 5d
 .code
 org 100h
 
-
 start	proc	
 
-	; parsing cmd arguments (now only can parse two-digital numers)
-	mov	bx, CMDLNSEG
-	cmp	byte ptr [bx], 0
-je @@start					; if program runned without arguments, start with default options
-
-	sub	word ptr [bx+2], '0' + '0'*100h	; convertion ascii to 2-digitals number
-	mov	al, byte ptr [bx+2]		; al = (highest digit)
-	mov	cl, 10d
-	mul	cl				; cl = cl*10 + (lower digit)
-	add	al, byte ptr [bx+3]
-
-	mov	box_width, al			; set box_width
-
+	call	atoi
+	mov	box_width, bl
 @@start:
 	call	cls				; clear screen
 	
